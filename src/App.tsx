@@ -4,6 +4,7 @@ import { AccountSwitcher } from '@/components/AccountSwitcher';
 import { StatsDashboard } from '@/components/StatsDashboard';
 import { AlexLog } from '@/components/AlexLog';
 import { RobotPanel } from '@/components/RobotPanel';
+import { MatchesDiffersScanner } from '@/components/MatchesDiffersScanner';
 import { Toaster } from '@/components/ui/sonner';
 import { TrendingUp, LayoutDashboard, Settings, Info, Activity } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -106,6 +107,7 @@ function App() {
             </div>
 
             <StatsDashboard stats={stats} />
+            <MatchesDiffersScanner stats={stats} />
           </div>
 
           <div className="space-y-6">

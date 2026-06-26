@@ -46,7 +46,7 @@ export const AlexLog: React.FC<AlexLogProps> = ({ signals }) => {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <TrendingUp className={`w-4 h-4 ${signal.type === 'EVEN' || signal.type === 'OVER' ? 'text-emerald-500' : 'text-purple-500'}`} />
+                      <TrendingUp className={`w-4 h-4 ${signal.type === 'DIFFERS' ? 'text-cyan-400' : signal.type === 'EVEN' || signal.type === 'OVER' ? 'text-emerald-500' : 'text-purple-500'}`} />
                       <span className="font-bold text-sm">Signal: {signal.type}</span>
                     </div>
                     <div className="flex items-center gap-1 text-[10px] text-muted-foreground">

@@ -12,11 +12,12 @@ export type AnalysisStats = {
   over: number;
   under: number;
   lastDigits: number[];
+  digitFrequency: Record<number, number>;
 };
 
 export type Signal = {
   id: string;
-  type: 'EVEN' | 'ODD' | 'OVER' | 'UNDER';
+  type: 'EVEN' | 'ODD' | 'OVER' | 'UNDER' | 'DIFFERS';
   probability: number;
   timestamp: number;
   message: string;
@@ -49,7 +50,14 @@ const DERIV_WS_URL = 'wss://ws.binaryws.com/websockets/v3?app_id=1089';
 
 export function useDerivAPI() {
   const [digits, setDigits] = useState<DigitData[]>([]);
-  const [stats, setStats] = useState<AnalysisStats>({ even: 0, odd: 0, over: 0, under: 0, lastDigits: [] });
+  const [stats, setStats] = useState<AnalysisStats>({ 
+    even: 0, 
+    odd: 0, 
+    over: 0, 
+    under: 0, 
+    lastDigits: [],
+    digitFrequency: {}
+  });
   const [signals, setSignals] = useState<Signal[]>([]);
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error' | 'authorized'>('idle');
   const [account, setAccount] = useState<AccountInfo | null>(null);
@@ -60,7 +68,6 @@ export function useDerivAPI() {
   
   const ws = useRef<WebSocket | null>(null);
   const tokenRef = useRef<string | null>(localStorage.getItem('deriv_token'));
-  const currentSubscription = useRef<string | null>(null);
 
   const addSignal = useCallback((type: Signal['type'], probability: number, message: string) => {
     const id = Date.now().toString();
@@ -89,12 +96,16 @@ export function useDerivAPI() {
     const overCount = digitValues.filter(d => d > 4).length;
     const underCount = digitValues.filter(d => d <= 4).length;
 
-    const newStats = {
+    const newStats: AnalysisStats = {
       even: (evenCount / digitValues.length) * 100,
       odd: (oddCount / digitValues.length) * 100,
       over: (overCount / digitValues.length) * 100,
       under: (underCount / digitValues.length) * 100,
-      lastDigits: digitValues
+      lastDigits: digitValues,
+      digitFrequency: digitValues.reduce((acc, d) => {
+        acc[d] = (acc[d] || 0) + 1;
+        return acc;
+      }, {} as Record<number, number>)
     };
 
     setStats(newStats);
@@ -121,6 +132,20 @@ export function useDerivAPI() {
       } else if (allOver) {
         addSignal('UNDER', 94, 'Detected 7 consecutive OVER digits. Market skewing low.');
       }
+    }
+
+    // Differs Signal Logic
+    const digitAppearance = new Array(10).fill(0).map((_, i) => {
+      const lastIndex = [...digitValues].reverse().indexOf(i);
+      return { digit: i, ticksSinceLast: lastIndex === -1 ? 100 : lastIndex };
+    });
+
+    const coldDigit = digitAppearance.reduce((prev, curr) => 
+      curr.ticksSinceLast > prev.ticksSinceLast ? curr : prev
+    );
+
+    if (coldDigit.ticksSinceLast >= 15) {
+      addSignal('DIFFERS', 98, `Digit ${coldDigit.digit} hasn't appeared for ${coldDigit.ticksSinceLast} ticks. High probability for DIFFERS ${coldDigit.digit}.`);
     }
   }, [addSignal]);
 
@@ -244,12 +269,16 @@ export function useDerivAPI() {
           const overCount = digitValues.filter(d => d > 4).length;
           const underCount = digitValues.length - overCount;
 
-          const newStats = {
+          const newStats: AnalysisStats = {
             even: (evenCount / digitValues.length) * 100,
             odd: (oddCount / digitValues.length) * 100,
             over: (overCount / digitValues.length) * 100,
             under: (underCount / digitValues.length) * 100,
-            lastDigits: digitValues
+            lastDigits: digitValues,
+            digitFrequency: digitValues.reduce((acc, d) => {
+              acc[d] = (acc[d] || 0) + 1;
+              return acc;
+            }, {} as Record<number, number>)
           };
           
           setStats(newStats);
@@ -276,7 +305,7 @@ export function useDerivAPI() {
       setStatus('error');
       Sonner.toast.error('WebSocket connection error');
     };
-  }, [calculateStats, selectedSymbol, processRobotLogic, trades, addSignal]);
+  }, [selectedSymbol, processRobotLogic, trades, addSignal, calculateStats]);
 
   const login = (token: string) => {
     tokenRef.current = token;
@@ -297,7 +326,14 @@ export function useDerivAPI() {
   const changeSymbol = (symbol: string) => {
     setSelectedSymbol(symbol);
     setDigits([]);
-    setStats({ even: 0, odd: 0, over: 0, under: 0, lastDigits: [] });
+    setStats({ 
+      even: 0, 
+      odd: 0, 
+      over: 0, 
+      under: 0, 
+      lastDigits: [], 
+      digitFrequency: {} 
+    });
     if (ws.current) ws.current.close();
   };
 
